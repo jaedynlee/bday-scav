@@ -600,6 +600,7 @@ const HUNT = {
       riddle: "This memory came back with its soundtrack scrambled.",
       photo: "assets/mem-lift.jpg", photoAlt: "The famous movie lift, recreated in the ocean: she's held up high over the water, arms out like wings",
       caption: "July 4, 2026 · (I've Had) The Time of My Life",
+      sound: "assets/audio.m4a",
       lines: [
         { text: "You're the one thing... I can't ____", answers: ["get / enough / of"], hint: "" },
         { text: "So I'll tell you something... This could _______", answers: ["be / love"], hint: "" },
@@ -1753,6 +1754,17 @@ function bindSpot(c) {
 }
 
 /* ---------- fill-in-the-blank puzzle ---------- */
+
+function playSound(src, near) {
+ const a = new Audio(src);
+ a.play().catch(() => {
+   const b = document.createElement("button");
+   b.type = "button"; b.className = "btn ghost"; b.textContent = "▶ Play sound";
+   b.onclick = () => { a.play().catch(() => {}); b.remove(); };
+   near.parentNode.insertBefore(b, near);
+ });
+}
+   
 function blanksMarkup(c) {
   return `
     <div class="bl-photo"><img id="blImg" src="${esc(c.photo)}" alt="${esc(c.photoAlt)}" draggable="false"><span class="bl-caption" id="blCap" hidden>${esc(c.caption)}</span></div>
@@ -1761,6 +1773,7 @@ function blanksMarkup(c) {
 }
 
 function bindBlanks(c) {
+  if (c.sound) playSound(c.sound, document.getElementById("blCard"));
   const img = document.getElementById("blImg"), card = document.getElementById("blCard"), fb = document.getElementById("fb");
   const total = c.lines.length; let at = 0;
   const focus = () => { img.style.filter = `blur(${(22 * (1 - at / total)).toFixed(1)}px) saturate(${(.4 + .6 * at / total).toFixed(2)})`; };
