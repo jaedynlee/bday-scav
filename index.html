@@ -136,7 +136,8 @@ form.answer input::placeholder { color: var(--amber-dim); }
 .fslot { position: absolute; border-radius: 50%; border: 2px dashed var(--amber); background: rgba(242,169,59,.08);
   padding: 0; overflow: hidden; }
 .fslot.hover { background: rgba(242,169,59,.35); border-style: solid; }
-.fslot.filled { border: 0; background: none; cursor: default; }
+.fslot.filled { border: 0; background: none; cursor: default; overflow: visible; outline: none; }
+.fslot.filled img { transform: scale(1.14); }   /* covers the blurred patch left where the face was cut out */
 .fslot img { width: 100%; height: 100%; display: block; }
 .tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .piece { background: none; border: 2px solid transparent; padding: 2px; border-radius: 50%; touch-action: none; line-height: 0;
@@ -185,8 +186,12 @@ form.answer input::placeholder { color: var(--amber-dim); }
 .who .blush, .who .eyes-closed { opacity: 0; transition: opacity .4s; }
 .nye.kissing .who .blush, .nye.kissing .girl .eyes-closed { opacity: .8; }
 .nye.kissing .girl .eyes-open { opacity: 0; }
-.nye.kissing .guy svg { transform: rotate(4deg); }
-.nye.kissing .girl svg { transform: rotate(-11deg) translateX(-6%); }
+.who .pose { display: block; }
+.who .side, .who.arrived .front { display: none; }
+.who.arrived .side { display: block; }
+.who .side .blush { opacity: .55; }
+/* upright side profiles already meet lip to lip in the middle; no extra lean */
+.nye.kissing .guy .side svg, .nye.kissing .girl .side svg { transform: none; }
 .heart { position: absolute; left: 50%; top: 30%; width: 30px; margin-left: -15px; z-index: 4; opacity: 0; transform: scale(.4); pointer-events: none; }
 .nye.kissing .heart { animation: heart 2.2s ease-out .35s forwards; }
 @keyframes heart { 0% { opacity: 0; transform: translateY(0) scale(.4); } 20% { opacity: 1; transform: translateY(-6px) scale(1.15); }
@@ -988,6 +993,39 @@ const GIRL_SVG = `<svg viewBox="0 0 120 240" aria-hidden="true">
   <circle cx="35" cy="92" r="2.6" fill="#e2b34a"/><circle cx="85" cy="92" r="2.6" fill="#e2b34a"/>
 </svg>`;
 
+// side profiles, used once each person reaches the middle: facing each other, eyes closed, lips puckered
+const GUY_SIDE_SVG = `<svg viewBox="0 0 120 240" aria-hidden="true">
+  <rect x="40" y="186" width="17" height="54" rx="4" fill="#2a3242"/><rect x="63" y="186" width="17" height="54" rx="4" fill="#2a3242"/>
+  <path d="M20 204 Q16 132 40 114 L80 114 Q104 132 100 204 Z" fill="#1c1f26"/>
+  <rect x="50" y="100" width="18" height="16" fill="#cf9a74"/>
+  <path d="M38 112 Q60 130 82 112 L83 126 Q60 144 37 126 Z" fill="#545a64"/>
+  <rect x="66" y="128" width="11" height="34" rx="3" fill="#545a64"/>
+  <path d="M33 80 Q32 50 58 50 Q84 50 86 74 L89 84 L85 87 Q86 96 84 104 Q76 112 60 110 Q36 108 33 80 Z" fill="#d9a47e"/>
+  <ellipse cx="44" cy="84" rx="5" ry="8" fill="#c48d68"/>
+  <ellipse class="blush" cx="70" cy="96" rx="6" ry="3.5" fill="#e77c7c"/>
+  <path d="M30 72 Q28 36 58 36 Q86 38 86 68 Z" fill="#23262d"/>
+  <rect x="27" y="62" width="62" height="13" rx="5" fill="#2e333c"/>
+  <path d="M60 68 q4 -3 8 0 t8 0" stroke="#e8e8e8" stroke-width="1.6" fill="none"/>
+  <rect x="66" y="76" width="16" height="12" rx="4" fill="rgba(255,255,255,.18)" stroke="#262626" stroke-width="2.6"/>
+  <path d="M66 80 L46 81" stroke="#262626" stroke-width="2.4"/>
+  <path d="M70 83 Q74 86 78 83" stroke="#1d1d1d" stroke-width="2" fill="none"/>
+  <ellipse cx="88" cy="99" rx="4.2" ry="3.6" fill="#b35a54"/><ellipse cx="89" cy="98" rx="1.4" ry="1" fill="#e9a29a"/>
+</svg>`;
+const GIRL_SIDE_SVG = `<svg viewBox="0 0 120 240" aria-hidden="true">
+  <path d="M30 82 Q30 40 64 40 Q98 42 96 86 L102 172 Q66 186 30 172 Z" fill="#4a1d25"/>
+  <rect x="42" y="188" width="16" height="52" rx="4" fill="#1e2129"/><rect x="62" y="188" width="16" height="52" rx="4" fill="#1e2129"/>
+  <path d="M22 206 Q18 134 42 116 L78 116 Q102 134 98 206 Z" fill="#262a33"/>
+  <rect x="52" y="102" width="16" height="16" fill="#bf8463"/>
+  <path d="M87 80 Q88 52 62 52 Q37 52 35 74 L32 84 L36 87 Q35 95 37 102 Q45 110 60 108 Q84 106 87 80 Z" fill="#c98e6c"/>
+  <ellipse class="blush" cx="50" cy="94" rx="5.5" ry="3.2" fill="#e0706f"/>
+  <path d="M90 82 Q92 46 62 46 Q40 46 38 66 Q52 56 70 62 Q82 68 84 84 Z" fill="#4a1d25"/>
+  <path d="M86 78 Q92 120 82 152 L94 154 Q104 118 96 80 Z" fill="#5a2430"/>
+  <path d="M42 83 Q46 87 50 83" stroke="#1d1d1d" stroke-width="2" fill="none"/>
+  <path d="M42 77 q4 -3 9 -1" stroke="#3a1a1d" stroke-width="1.8" fill="none"/>
+  <ellipse cx="32" cy="98" rx="4" ry="3.4" fill="#a8434a"/><ellipse cx="31" cy="97" rx="1.3" ry=".9" fill="#e48c90"/>
+  <circle cx="78" cy="92" r="2.6" fill="#e2b34a"/>
+</svg>`;
+
 function nyeSkyline() {
   // deterministic pseudo-random so the skyline is the same every time
   let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
@@ -1026,8 +1064,8 @@ function kissMarkup(c) {
       <div class="count" id="count" aria-live="assertive"></div>
       <div class="nye-overlay" id="nyeStart"><button class="btn" id="kstart" type="button">Start countdown</button></div>
       <div class="nye-overlay" id="nyeFail" hidden><p id="failMsg"></p><button class="btn" id="kreplay" type="button">Replay</button></div>
-      <button type="button" class="who guy" id="guy" aria-label="Move him toward the middle">${GUY_SVG}</button>
-      <button type="button" class="who girl" id="girl" aria-label="Move her toward the middle">${GIRL_SVG}</button>
+      <button type="button" class="who guy" id="guy" aria-label="Move him toward the middle"><span class="pose front">${GUY_SVG}</span><span class="pose side">${GUY_SIDE_SVG}</span></button>
+      <button type="button" class="who girl" id="girl" aria-label="Move her toward the middle"><span class="pose front">${GIRL_SVG}</span><span class="pose side">${GIRL_SIDE_SVG}</span></button>
       <div class="heart" id="heart" aria-hidden="true">
         <svg viewBox="0 0 32 30"><path d="M16 29 C6 21 0 15 0 8.5 A8 8 0 0 1 16 5 A8 8 0 0 1 32 8.5 C32 15 26 21 16 29 Z" fill="#ff5d7a"/></svg>
       </div>
