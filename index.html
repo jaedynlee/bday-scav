@@ -531,6 +531,7 @@ const HUNT = {
       // one entry per person: [centre x, centre y, radius x, radius y] in photo pixels; face file is assets/face-NN.png
       faces: [[340,250,24,30],[454,238,27,33],[572,210,26,32],[696,186,31,37],[884,97,40,47],[1086,77,46,54],
               [99,427,33,38],[218,438,37,42],[340,455,38,44],[436,530,44,50],[612,492,52,60],[872,564,66,76],[1330,580,130,150]],
+      decoys: 5,                     // extra faces of people who weren't there (assets/face-d1.png ... face-d5.png)
       hint: "" },
     { stamp: "T-11", type: "order", title: "Timeline fracture",
       riddle: "Four memories from the same few weeks came back out of order. Tap them in the order they happened.",
@@ -623,7 +624,8 @@ const HUNT = {
       hint: "" },
     { stamp: "T-01", type: "maze", title: "Lost in the stalks",
       riddle: "The last jump dropped you in the middle of a haunted corn maze at night.",
-      size: 9,                       // maze is size × size cells; bigger is harder
+      size: 13,                      // maze is size × size cells; bigger is harder
+      seed: 1117,                    // same maze every time; change the number for a different layout
       photo: "assets/mem-maze.jpg", photoAlt: "The whole crew pulling faces under a giant scarecrow at a haunted farm, with an actor in creepy makeup posing in front",
       caption: "Leechwoods · October 2026",
       hint: "" },
@@ -804,10 +806,13 @@ function facesMarkup(c) {
   const slots = c.faces.map(([cx, cy, rx, ry], i) => `
     <button type="button" class="fslot" data-i="${i}" aria-label="Empty spot ${i + 1}"
       style="left:${pct(cx - rx, c.width)};top:${pct(cy - ry, c.height)};width:${pct(2 * rx, c.width)};height:${pct(2 * ry, c.height)}"></button>`).join("");
-  const order = c.faces.map((_, i) => i).sort(() => Math.random() - .5);
-  const pieces = order.map(i => `
-    <button type="button" class="piece" data-i="${i}" aria-label="Face ${order.indexOf(i) + 1}">
-      <img src="assets/face-${String(i).padStart(2, "0")}.png" alt="" draggable="false"></button>`).join("");
+  // real faces plus decoys (people who weren't there); decoys match no spot
+  const ids = [...c.faces.map((_, i) => String(i)), ...Array.from({ length: c.decoys || 0 }, (_, k) => "d" + (k + 1))];
+  const order = ids.sort(() => Math.random() - .5);
+  const src = id => id[0] === "d" ? `assets/face-${id}.png` : `assets/face-${id.padStart(2, "0")}.png`;
+  const pieces = order.map((id, n) => `
+    <button type="button" class="piece" data-i="${id}" aria-label="Face ${n + 1}">
+      <img src="${src(id)}" alt="" draggable="false"></button>`).join("");
   return `
     <div class="viewport" id="viewport">
       <div class="stage" id="stage"><img src="${esc(c.photo)}" alt="Group photo at a hockey game with every face missing" draggable="false">${slots}</div>
@@ -1831,21 +1836,26 @@ function bindMaze(c) {
   const ctx = cv.getContext("2d"), n = c.size, G = 2 * n + 1;          // G×G tiles: odd tiles are cells, even are walls
   const open = new Uint8Array(G * G), at = (x, y) => y * G + x;
   // carve a perfect maze (one path between any two cells) with a randomized depth-first search
-  const seen = new Uint8Array(n * n), stack = [[0, 0]]; seen[0] = 1; open[at(1, 1)] = 1;
+  // seeded random numbers, so the layout is the same every time
+  let seed = (c.seed || 1) >>> 0;
+  const rand = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const mid = (n - 1) >> 1;                                   // start in the middle of the field
+  const seen = new Uint8Array(n * n), stack = [[mid, mid]]; seen[mid * n + mid] = 1; open[at(2 * mid + 1, 2 * mid + 1)] = 1;
   while (stack.length) {
     const [cx, cy] = stack[stack.length - 1];
     const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [cx + dx, cy + dy, dx, dy])
       .filter(([x, y]) => x >= 0 && y >= 0 && x < n && y < n && !seen[y * n + x]);
     if (!nb.length) { stack.pop(); continue; }
-    const [x, y, dx, dy] = nb[Math.floor(Math.random() * nb.length)];
+    const [x, y, dx, dy] = nb[Math.floor(rand() * nb.length)];
     seen[y * n + x] = 1; open[at(2 * cx + 1 + dx, 2 * cy + 1 + dy)] = 1; open[at(2 * x + 1, 2 * y + 1)] = 1;
     stack.push([x, y]);
   }
   const exit = { x: G - 2, y: G - 2 };
-  const me = { x: 1, y: 1, fx: 1, fy: 1 };          // tile position and smoothed draw position
+  const me = { x: 2 * mid + 1, y: 2 * mid + 1, fx: 2 * mid + 1, fy: 2 * mid + 1 };   // tile position and smoothed draw position
   let queue = [], done = false, steps = 0, size = 0, dpr = 1, last = performance.now();
   // corn stalk positions, fixed per wall tile so they don't shimmer
-  const stalks = []; for (let i = 0; i < G * G; i++) if (!open[i]) for (let k = 0; k < 3; k++) stalks.push([i % G + Math.random(), ((i / G) | 0) + Math.random(), Math.random()]);
+  const stalks = []; for (let i = 0; i < G * G; i++) if (!open[i]) for (let k = 0; k < 3; k++) stalks.push([i % G + rand(), ((i / G) | 0) + rand(), rand()]);
 
   const resize = () => { dpr = Math.min(2, devicePixelRatio || 1); size = stage.clientWidth; cv.width = cv.height = Math.round(size * dpr); cv.style.width = cv.style.height = size + "px"; };
   resize(); addEventListener("resize", resize);
@@ -1891,7 +1901,7 @@ function bindMaze(c) {
     ctx.fillStyle = lg; ctx.fillRect(exit.x - 1.5, exit.y - 1.5, 4, 4);
     ctx.fillStyle = "#ffd27a"; ctx.fillRect(exit.x + .35, exit.y + .3, .3, .4);
     // darkness with a flashlight hole around the player
-    const px = me.fx + .5, py = me.fy + .5, r = done ? G : 3.2;
+    const px = me.fx + .5, py = me.fy + .5, r = done ? G : 2.8;
     ctx.save();
     const dark = ctx.createRadialGradient(px, py, r * .35, px, py, r);
     dark.addColorStop(0, "rgba(4,6,12,0)"); dark.addColorStop(1, "rgba(4,6,12,.94)");
